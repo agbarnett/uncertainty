@@ -1,0 +1,28 @@
+model{
+  ## Likelihood
+  for (i in 1:N){
+    recommendation[i, 1:ncat] ~ dmulti(pi[i, 1:ncat], M)
+    # make probabilities
+    for (j in 1:ncat){
+      pi[i,j] <- (e[i,j] + f[i,j])/ (sum(e[i,1:ncat])+sum(f[i,1:ncat]))
+    }
+    # uncertainty equation (not-logged, but always positive)
+    for (k in 1:ncat){
+      f[i,k] <- U*X[i]
+    }
+    # regression equation and uncertainty (no regression equation for cat 1)
+    log(e[i, 1]) <- 0
+    for (k in 2:ncat){
+      log(e[i,k]) <- alpha[k-1]
+    }
+  }
+  ## Priors
+  U <- spike*(1-delta) + slab*delta
+  spike <- 0
+  slab ~ dunif(0,10)
+  delta ~ dbern(p_precision)
+  p_precision ~ dbeta(1,1)
+  for (k in 1:(ncat-1)){
+    alpha[k] ~ dnorm(0, 0.0001)
+  }
+}

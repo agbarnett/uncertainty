@@ -1,0 +1,700 @@
+---
+title: "Summary statistics for peer review uncertainty study"
+author: "Adrian Barnett"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, error=FALSE, comment='', dpi=400)
+options(width=1000) # Wide pages
+options(scipen=999) # avoid scientific presentation
+library(binom) # for confidence intervals
+library(tidyr)
+library(stringr)
+library(dplyr)
+options(dplyr.summarise.inform = FALSE)
+library(janitor)
+library(flextable)
+source('99_functions.R')
+source('3_labels.R') # labels for recommendations
+
+# graphics set up
+library(ggplot2)
+library(grid)
+library(gridExtra)
+g.theme = theme_bw() + theme(panel.grid.minor = element_blank())
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+source('3_colours.R') # colour-schemes for each journal
+
+# from 2_read_journal_data.R (after journal stuff is added)
+load('data/2_data.RData')
+```
+
+# Recruitment
+
+Plot of recruitment over time by journal.
+
+```{r}
+source('3_plot_recruitment_over_time.R')
+print(gplot)
+# for text
+first = min(data$recorded_date)
+last = max(data$recorded_date)
+days_recruit = as.numeric(last - first)
+first = format(first, '%d %b %Y')
+last = format(last, '%d %b %Y')
+```
+
+The total number recruited is `r nrow(data)`. The first participant was recruited on `r first` and the last on `r last`, which is `r days_recruit` days.
+
+### Number of responses by journal
+
+```{r}
+tab = tabyl(data$journal) %>%
+  mutate(percent = percent*100)
+names(tab)[1] = 'Journal'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+
+
+## Time taken to answer questions
+
+```{r}
+# Move to down with questionnaire completeness? section on question meta-data??
+stats = summarise(data,
+            Q1 = round(quantile(duration_mins, 0.25)),
+            median = round(median(duration_mins)),
+            Q3 = round(quantile(duration_mins, 0.75)))
+#
+ftab = flextable(stats) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
+The summary statistics show the time in minutes to complete the online questions. Q1 is the lower quartile and Q3 is the upper quartile.
+
+
+# Reviewers' characteristics
+
+### Time taken for review
+
+How much time did you spend on your review in hours? Include your time reading the paper and providing feedback.
+
+```{r}
+hplot = ggplot(data=data, aes(x=q2_2))+
+  geom_histogram(fill='dodgerblue')+
+  xlab('Time (hours)')+
+  g.theme
+hplot
+```
+
+There are a few large positive outliers where reviewers spent many weeks on the paper. It is possible that these reviewers wrongly answered in terms of minutes rather than hours.
+
+
+##### Summary statistics on time taken (hours)
+
+```{r}
+tab  = summarise(data, 
+                 missing = sum(is.na(q2_2)),
+                 Q1 = quantile(q2_2, 0.25, na.rm=TRUE),
+                 Median = quantile(q2_2, 0.5, na.rm=TRUE),
+                 Q3 = quantile(q2_2, 0.75, na.rm=TRUE))
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
+### Reviewers' gender
+
+```{r}
+tab = mutate(data, q2_3 = ifelse(is.na(q2_3), 'Missing', q2_3)) %>%
+  tabyl(q2_3) %>%
+  mutate(percent = percent*100) %>%
+  filter(n > 0)  # remove zero rows
+names(tab)[1] = 'Gender'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+### Reviewers' experience
+
+How many years have you worked in research? Answer in terms of working years, e.g., if 6 years of working half-time then answer 3 years ("Less than 5 years").
+
+```{r}
+tab = mutate(data, q2_4 = forcats::fct_explicit_na(q2_4, na_level = 'Missing')) %>% # replace missing
+  tabyl(q2_4) %>%
+  mutate(percent = round(percent*100)) 
+names(tab)[1] = 'Experience'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+### Reviewers' country
+
+```{r}
+tab = mutate(data, q2_5 = ifelse(is.na(q2_5), 'Missing', q2_5)) %>% # replace missing
+  tabyl(q2_5) %>%
+  mutate(percent = round(percent*100)) %>%
+  arrange(desc(n))
+# combine countries that are over 5
+not_small = filter(tab, n > 5)
+small = filter(tab, n <= 5) %>%
+  summarise(n = sum(n),
+            percent = sum(percent)) %>%
+  mutate(q2_5 = 'Other')
+tab = bind_rows(not_small, small)
+#
+names(tab)[1] = 'Country'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+To reduce the size of the table, we combine the countries that were given 5 times or fewer into "Other".
+
+### Paper type
+
+```{r}
+tab = mutate(data, paper_type = ifelse(is.na(paper_type), 'Missing', paper_type)) %>%
+  tabyl(paper_type) %>%
+  mutate(percent = percent*100) %>%
+  arrange(-n)
+names(tab)[1] = 'Paper type'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+The rows are ordered by frequency.
+Those with a missing paper type were the papers that could not be matched to the reviews.
+
+We combined "Study protocol" and "Protocol", and "Research article" and "Original research".
+
+### Version number
+
+```{r}
+tab = mutate(data, version_number = ifelse(is.na(version_number), 'Missing', version_number)) %>%
+  tabyl(version_number) %>%
+  mutate(percent = percent*100)
+names(tab)[1] = 'Version number'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+
+The paper's version number.
+Those with a missing version number were the papers that could not be matched to the reviews.
+
+### Time between journal submission and review
+
+This is the time (in days) between the date the paper was submitted to the journal and the date of the review.
+
+```{r}
+hplot = ggplot(data=data, aes(x = time_diff))+
+  geom_histogram(fill='dodgerblue')+
+  xlab('Time (days)')+
+  ylab('Count')+
+  g.theme
+hplot
+# for text
+qs = as.numeric(quantile(data$time_diff, probs=c(0.25,0.5,0.75), na.rm=TRUE))
+```
+
+The median time was `r qs[2]` with a first to third quartile of `r qs[1]` to `r qs[3]`.
+
+### Time between journal submission and review (by journal)
+
+```{r}
+bplot = ggplot(data=data, aes(x = journal, y= time_diff, fill=journal))+
+  geom_boxplot()+
+  ylab('Time (days)')+
+  xlab('')+
+  coord_flip()+
+  g.theme+
+  theme(legend.position = 'none')
+bplot
+```
+
+There are two outliers for F1000 which were checked.
+
+# Uncertainty in peer review
+
+### Number who could not answer the question
+
+As eliciting uncertainty is a relatively unusual concept, we gave reviewers the option of saying they could not answer. Below the question on uncertainty, we included the text: "If you cannot answer the question then please click this radio button." The table below shows the number who clicked this button.
+
+```{r}
+tab = tabyl(data, cannot_answer) %>%
+  mutate(percent = percent*100)
+names(tab)[1] = 'Could not answer'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+# but who still gave reasonable percentages?
+still_ok = filter(data, cannot_answer == 'Ticked') %>%
+  select(id, starts_with('q1_1_')) %>%
+  pivot_longer(-id) %>%
+  group_by(id) %>%
+  summarise(total = sum(value, na.rm = TRUE)) %>%
+  filter(total > 0) %>% # still made some effort
+  nrow()
+```
+
+Only a small percentage of reviewers could not answer the question.
+
+`r still_ok` reviewers clicked the button, but still gave reasonable percentages. We therefore only exclude reviewers from the analyses below if only gave only zero percentages or clicked the radio button and gave no responses.
+
+### Number where percentages do not add to 100%
+
+Here we examine if the uncertainty percentages given by reviewers added to the expected 100%. If reviewers gave an answer under or over 100% it may be a simple arithmetic error or a misunderstanding of the question. 
+
+```{r}
+for_table = select(data, 'id', starts_with('q1_1')) %>%
+  pivot_longer(cols=starts_with('q1_1')) %>%
+  group_by(id) %>%
+  summarise(total = sum(value, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(is_100 = total == 100) %>%
+  mutate(is_100 = as.numeric(is_100),
+         is_100 = factor(is_100, levels=0:1, labels=c('No','Yes')))
+tab = tabyl(for_table, is_100) %>%
+  mutate(percent = percent*100)
+names(tab)[1] = 'Adds to 100%'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+```
+
+The plot below shows the percentage totals for the responses that did not add to 100%.
+
+```{r, fig.height=2, fig.width=5}
+for_table = filter(for_table, total != 100)
+upper_x = max(100, max(for_table$total)) # upper limit on x-axis of 100 or highest value over 100
+gplot = ggplot(data=for_table, aes(x=total))+
+  geom_dotplot(binwidth = 1, dotsize=3)+
+  scale_x_continuous(limits=c(0, upper_x), breaks = seq(0,100,20))+
+  scale_y_continuous(breaks = NULL)+
+  xlab('Total percentage')+
+  ylab('')+
+  g.theme
+gplot
+# export
+jpeg('figures/dotplot_not_100.jpg', width=5, height=2, units='in', res=400, quality = 100)
+print(gplot)
+invisible(dev.off())
+```
+
+We exclude the reviewers whose total percentages were 0%, assuming this meant they could not answer the question. 
+For those whose answers were above zero but not 100%, we redistributed the percentages. For example, if a reviewer answered 80% Approved, 10% Approved with Reservations, and 0% Not Approved (which adds to 90%), we changed this to: 89%, 11%, 0%. 
+
+```{r, include=FALSE}
+## re-distribute for those whose totals are over 0 (from subgroup with totals not equal to 100%)
+redist = filter(for_table, total > 0) %>%
+  mutate(redistribute = TRUE) %>%
+  select(id, redistribute)
+## add exclude flag to data for zeros
+exclude = filter(for_table, total == 0) %>%
+  mutate(exclude = TRUE) %>%
+  select(id, exclude)
+n_started = nrow(data) # used by CONSORT flow chart
+# add back to main data
+data = full_join(data, exclude, by='id') %>%
+  full_join(redist, by='id') %>%
+  mutate(redistribute = ifelse(is.na(redistribute), FALSE, redistribute),
+         exclude = ifelse(is.na(exclude), FALSE, exclude)) 
+n_excluded = sum(data$exclude) # used by CONSORT flow chart
+data_not_excluded = filter(data, exclude == FALSE)
+# use function to redistribute
+data_not_excluded = redistribute(data_not_excluded)
+# Add variable for zero uncertainty
+data_not_excluded = mutate(data_not_excluded, 
+      temporary = paste(q1_1_1, q1_1_2, q1_1_3, q1_1_4, q1_1_5, q1_1_6),
+      zero = as.numeric(str_detect(temporary, pattern='100')), # any 100's means no uncertainty
+      zero = factor(zero, levels=0:1, labels=c('Some','None'))) %>%
+  select(-temporary)
+# save for 3_analyses.Rmd
+save(data_not_excluded, file = 'data/3_not_excluded_data.RData')
+```
+
+The results in the following sections exclude the `r n_excluded` reviewers who gave zero responses.
+
+### Number and percent with no uncertainty
+
+The table below shows the number of times reviewers reported no uncertainty. This is regardless of their recommendation, so includes 100% certainty of approve or reject.
+
+```{r}
+#
+tab = tabyl(data_not_excluded, zero) %>%
+  mutate(percent = percent*100)
+names(tab)[1] = 'Uncertainty'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
+# for text below
+ci = binom.confint(x = sum(data_not_excluded$zero == 'Some'), n = sum(!is.na(data_not_excluded$zero)), method='logit')
+mean = round(ci$mean*100)
+lower = round(ci$lower*100)
+upper = round(ci$upper*100)
+```
+
+The percentage with some uncertainty is `r mean`% with a 95% confidence interval from `r lower`% to `r upper`%. This confidence interval was made using a logit parameterisation, using the normal approximation gave almost the same intervals.
+
+The percentage with no uncertainty was `r 100-mean`% with a 95% confidence interval from `r 100-upper`% to `r 100-lower`%.
+
+##### No uncertainty by decision and journal
+
+```{r}
+#
+stats = filter(data_not_excluded, !is.na(q1_3)) %>% # exclude missing recommendations 
+  group_by(journal, q1_3) %>%
+  filter(!is.na(q1_3), q1_3 != '') %>% # exclude 1 missing
+  summarise(n = n(), 
+         r = sum(zero=='None')) %>%
+  mutate(q1_3 = factor(q1_3, levels = big_rlabels), # for ordering in table (from 2_labels.R)
+         p = r/n,
+         lower = binom.confint(x = r, n = n, method='logit')$lower,
+         upper = binom.confint(x = r, n = n, method='logit')$upper) 
+tab = mutate(stats, p = round(p*100),
+         lower = round(lower*100),
+         upper = round(upper*100),
+         cell = paste(r, '/', n, ' (', p, ')', sep=''),
+         CI = paste(lower, ' to ', upper, sep='')) %>%
+  select(journal, q1_3, cell, CI) %>%
+  arrange(journal, q1_3) %>% # for ordering by decision
+  rename('Decision' = 'q1_3',
+         'r / n (%)' = 'cell') 
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  merge_v(j=1) %>%
+  autofit()
+ftab
+```
+
+The table shows the number with no uncertainty (r), the denominator (n), the percent, and a 95% confidence interval for the percent.
+We excluded the responses with missing decisions.
+
+There was generally more certainty (higher percentage) for the accept/reject decisions, and more uncertainty for the middle-ground decisions.
+
+##### Plot
+
+The plot shows the results presented in the table above, with the mean and 95% confidence interval for the percentage with no uncertainty.
+
+```{r}
+# add labels for numbers
+text = select(stats, -p) %>%
+  mutate(p = 100,
+         label = n)
+
+# plot
+lplot = ggplot(data = stats, aes(x=q1_3, y = 100*p, ymin = 100*lower, ymax = 100*upper))+
+  geom_point(col='navy', size=3)+
+  geom_errorbar(width=0, size=1.05, col='navy')+
+  geom_text(data = text, aes(x=q1_3, y=p, label = label), fontface = "italic")+
+  facet_wrap(~journal, scales = 'free_x')+
+  g.theme+
+  theme(axis.text.x = element_text(angle=45, hjust=1))+
+  xlab('')+
+  ylab('Percentage with no uncertainty')
+lplot
+# export
+jpeg('figures/no_uncertainty.jpg', width=8, height=6, units='in', res=600, quality=100)
+print(lplot)
+invisible(dev.off())
+```
+
+
+##### "No recommendation" at Epidemiology
+
+Epidemiology had an option of "No recommendation" as a recommendation. Here we check if this was ever selected in the uncertainty results. The table below shows the summary statistics for the "No recommendation" category.
+
+```{r}
+# 
+tab = filter(data_not_excluded, journal=='Epidemiology') %>%
+  summarise(n = n(), 
+            not_zero = sum(q1_1_6> 0, na.rm = TRUE),
+            max = max(q1_1_6, na.rm=TRUE)) %>%
+  rename('Not zero for None' = 'not_zero',
+         'Highest percent for None' = 'max')
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
+There was only 1 response that included "None" and this allocated 5%. For the statistical models that assumed an ordinal response, this single response was ignored and the respondents remaining 95% were scaled to add to 100%.
+
+## Uncertainty visualisation
+
+```{r, fig.width=9, fig.height=8}
+colours = c('darkorange2', 'darkseagreen3') # some and none
+## plots grouped by recommendation
+#
+for_plot = filter(data_not_excluded, journal == 'F1000') %>%
+  select('id', 'q1_3', 'zero', starts_with('q1_1')) %>%
+  pivot_longer(cols=starts_with('q1_1')) %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    q1_3 = ifelse(is.na(q1_3), 'Missing', q1_3), # recommendation
+    q1_3 = factor(q1_3, levels = rlabels_f1000), # for ordering in plot
+    recommendation = as.numeric(str_remove_all(name, pattern='q1_1_')),
+    recommendation = factor(recommendation, levels=1:3, labels=rlabels_return_f1000)) # not missing in labels
+#
+plot_f1000 = ggplot(data=for_plot, aes(x=recommendation, y=value, group=id, colour=zero))+
+  ggtitle('F1000')+
+  geom_point(size=1.2)+
+  geom_line()+
+  scale_colour_manual('Uncertainty', values=colours)+
+  g.theme+
+  ylab('Percent')+
+  xlab('')+
+  scale_x_discrete(expand = c(0.07,0.07))+ # reduce space at left/right edge
+  facet_wrap(~q1_3, scales='free_x', nrow=1)+
+  theme(axis.text.x = element_text(angle=45, size=6, hjust=1), # angled and smaller
+        legend.position = 'top')
+
+### Epidemiology
+for_plot = filter(data_not_excluded, journal == 'Epidemiology') %>%
+  select('id', 'q1_3', 'zero', starts_with('q1_1')) %>% # if none is selected
+#  select('id', 'q1_3', 'zero', 'q1_1_1', 'q1_1_2', 'q1_1_3', 'q1_1_4', 'q1_1_5') %>% # version without "None"
+  pivot_longer(cols=starts_with('q1_1')) %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    q1_3 = ifelse(is.na(q1_3), 'Missing', q1_3), # recommendation
+    q1_3 = factor(q1_3, levels = rlabels_epi), # for ordering in plot
+    recommendation = as.numeric(str_remove_all(name, pattern='q1_1_')),
+    recommendation = factor(recommendation, levels=1:6, labels = rlabels_return_epi)) # 
+plot_epidemiology = ggplot(data=for_plot, aes(x=recommendation, y=value, group=id, colour=zero))+
+  ggtitle('Epidemiology')+
+  geom_point(size=1.2)+
+  geom_line()+
+  scale_colour_manual('Uncertainty', values= colours)+
+  g.theme+
+  ylab('Percent')+
+  xlab('')+
+  scale_x_discrete(expand = c(0.07,0.07))+ # reduce space at left/right edge
+  facet_wrap(~q1_3, scales='free_x', nrow=1)+ # on one row
+  theme(strip.text.x = element_text(size = 7), # smaller facet text  
+        axis.text.x = element_text(angle=45, size=6, hjust=1), # angled and smaller
+        legend.position = 'none')
+
+### BMJ Open
+for_plot = filter(data_not_excluded, journal == 'BMJ Open') %>%
+  select('id', 'q1_3', 'zero', starts_with('q1_1')) %>%
+  pivot_longer(cols=starts_with('q1_1')) %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    q1_3 = ifelse(is.na(q1_3), 'Missing', q1_3), # recommendation
+    q1_3 = factor(q1_3, levels = rlabels_bmj), # for ordering in plot
+    recommendation = as.numeric(str_remove_all(name, pattern='q1_1_')),
+    recommendation = factor(recommendation, levels=1:5, labels = rlabels_return_bmj)) # 
+#
+plot_bmj_open = ggplot(data=for_plot, aes(x=recommendation, y=value, group=id, colour=zero))+
+  ggtitle('BMJ Open')+
+  geom_point(size=1.2)+
+  geom_line()+
+  scale_colour_manual('Uncertainty', values= colours)+
+  g.theme+
+  ylab('Percent')+
+  xlab('')+
+  scale_x_discrete(expand = c(0.07,0.07))+ # reduce space at left/right edge
+  facet_wrap(~q1_3, scales='free_x', nrow=1)+ # on one row
+  theme(axis.text.x = element_text(angle=45, size=6, hjust=1), # angled and smaller
+        legend.position = 'none')
+
+### legend as a separate plot
+legend = g_legend(plot_f1000)
+plot_f1000 = plot_f1000 + theme(legend.position = 'none') # now remove legend
+
+### put plots together
+gridExtra::grid.arrange(legend, plot_bmj_open, plot_f1000, plot_epidemiology, ncol=1, heights=c(0.1,1,1,1))
+
+# export
+jpeg('figures/uncertainty.jpg', width=8, height=6, units='in', res=600, quality=100)
+gridExtra::grid.arrange(legend, plot_bmj_open, plot_f1000, plot_epidemiology, ncol=1, heights=c(0.1,1,1,1))
+invisible(dev.off())
+```
+
+The plot shows the percentages given to each recommendation by the reviewers. There is a separate a panel for each recommendation and journal. The recommendation categories are different for each journal. 
+
+The lines in the plot are coloured by whether there was any uncertainty or not.
+
+Four of the responses in the "Approved with reservations" panel for F1000 have a modal probability of "Approved". It is possible that these respondents made an error when answering our question about their final recommendation. 
+
+The plot shows that any uncertainty tends to be in the neighbouring categories. 
+
+## Uncertainty visualisation using averages
+
+The plot below shows the average probabilities by journal and recommendation.
+The x-axis is the reviewers' decision, and the bars are coloured according to their probabilities. More colours in a bar indicates more uncertainty.
+
+```{r, fig.width=9, fig.height=8}
+stats = select(data_not_excluded, id, journal, q1_3, starts_with('q1_1')) %>%
+  pivot_longer(cols = starts_with('q1_1')) %>%
+  group_by(journal, q1_3, name) %>%
+  filter(!is.na(value),
+         !is.na(q1_3)) %>%
+  summarise(n =n(),
+            mean = mean(value)) %>%
+  ungroup() 
+
+## separate plot for each journal
+# F1000
+plot_observed1 = ggplot(data = filter(stats, journal=='F1000'), aes(x=q1_3, y=mean, fill=factor(name)))+
+  geom_bar(stat='identity', position='stack')+
+  ylab('Probability')+
+#  xlab('Recommendation')+
+  xlab('')+
+  ggtitle('F1000')+
+  scale_x_discrete(breaks = breaks_f1000, labels=breaks_f1000_return, expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(NULL, labels=breaks_f1000, values = colours_f1000)+
+  theme_bw()
+# BMJ Open
+plot_observed2 = ggplot(data = filter(stats, journal=='BMJ Open'), aes(x=q1_3, y=mean, fill=factor(name)))+
+  geom_bar(stat='identity', position='stack')+
+  ylab('Probability')+
+#  xlab('Recommendation')+
+  xlab('')+
+  ggtitle('BMJ Open')+
+  scale_x_discrete(limits=breaks_bmj, labels=breaks_bmj_return, expand = c(0,0))+ # limits does ordering
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(NULL, labels=breaks_bmj, values=colours_bmj)+
+  theme_bw()
+# Epidemiology
+to_plot = filter(stats, journal=='Epidemiology') %>%
+  filter(q1_3 != 'None') #
+plot_observed3 = ggplot(data = to_plot, aes(x=q1_3, y=mean, fill=factor(name)))+
+  geom_bar(stat='identity', position='stack')+
+  ylab('Probability')+
+  xlab('')+
+#  xlab('Recommendation')+
+  ggtitle('Epidemiology')+
+  scale_x_discrete(limits=breaks_epi_no_none, labels=breaks_epi_no_none_return, expand = c(0,0))+ # without none ... 
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(NULL, labels=breaks_epi, values=colours_epi)+ #... with none
+  theme_bw()+
+  theme(axis.text.x = element_text(angle=45, hjust=1)) # angled and smaller
+## making legend area consistent, see https://stackoverflow.com/questions/16255579/how-can-i-make-consistent-width-plots-in-ggplot-with-legends
+# Get the widths
+g1 <- ggplotGrob(plot_observed1)
+g2 <- ggplotGrob(plot_observed2)
+g3 <- ggplotGrob(plot_observed3)
+
+# Combine the plots
+g = gridExtra::gtable_rbind(g1, g2, g3, size = "max")
+
+# Draw it, using grid library
+grid.newpage()
+grid.draw(g)
+```
+
+# Results by reviewer characteristics
+
+## Results by gender
+
+Here we plot the average probabilities by journal and gender.
+
+```{r, fig.width=9, fig.height=8}
+stats = select(data_not_excluded, id, q2_3, journal, q1_3, starts_with('q1_1')) %>%
+  pivot_longer(cols = starts_with('q1_1')) %>%
+  mutate(gender = ifelse(q2_3 == 'Male', "Male", "Not male")) %>%
+  group_by(journal, gender, q1_3, name) %>%
+  filter(!is.na(value),
+         !is.na(gender),
+         !is.na(q1_3)) %>%
+  summarise(n =n(),
+            mean = mean(value)) %>%
+  ungroup() 
+## separate plot for each journal
+# F1000
+plot_observed_gender1 = ggplot(data = filter(stats, journal=='F1000'), aes(x=q1_3, y=mean, fill=factor(name)))+
+  geom_bar(stat='identity', position='stack')+
+  ylab('Probability')+
+  xlab('')+
+  #xlab('Recommendation')+
+  ggtitle('F1000')+
+  scale_x_discrete(breaks=breaks_f1000, labels = breaks_f1000_return, expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(NULL, labels=breaks_f1000, values=colours_f1000)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle=45, size=6, hjust=1)) + # angled and smaller
+  facet_wrap(~ gender)
+# BMJ Open
+plot_observed_gender2 = ggplot(data = filter(stats, journal=='BMJ Open'), aes(x=q1_3, y=mean, fill=factor(name)))+
+  geom_bar(stat='identity', position='stack')+
+  ylab('Probability')+
+  #xlab('Recommendation')+
+  xlab('')+
+  ggtitle('BMJ Open')+
+  scale_x_discrete(limits=breaks_bmj, labels=breaks_bmj_return, expand = c(0,0))+ # limits does ordering
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(NULL, labels=breaks_bmj, values=colours_bmj)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle=45, size=6, hjust=1)) + # angled and smaller
+  facet_wrap(~ gender)
+# Epidemiology
+plot_observed_gender3 = ggplot(data = filter(stats, journal=='Epidemiology'), aes(x=q1_3, y=mean, fill=factor(name)))+
+  geom_bar(stat='identity', position='stack')+
+  ylab('Probability')+
+  xlab('')+
+  #xlab('Recommendation')+
+  ggtitle('Epidemiology')+
+  scale_x_discrete(limits=breaks_epi_no_none, labels=breaks_epi_no_none_return, expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(NULL, labels=breaks_epi, values=colours_epi)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle=45, size=6, hjust=1)) + # angled and smaller
+  facet_wrap(~ gender)
+
+# Get the widths
+g1 <- ggplotGrob(plot_observed_gender1)
+g2 <- ggplotGrob(plot_observed_gender2)
+g3 <- ggplotGrob(plot_observed_gender3)
+
+# Combine the plots
+g = gridExtra::gtable_rbind(g1, g2, g3, size = "max")
+
+# Draw it, using grid library
+grid.newpage()
+grid.draw(g)
+```
+
+<!--- ## Flow chart of respondents --->
+
+```{r consort, fig.height=5, include=FALSE}
+source('3_consort_flow.R')
+#consort_plot # does not need print
+
+# will not work with docx and could not find a work around, just use PDF instead created by 3_consort_flow.R
+
+#CONSORT-style flowchart of respondents. The last box of "Review matched to journal" are those participants who provided the title of the paper they reviewed and which could be matched to records from the journal. This final box shows the participants for whom a complete case analysis could be made.
+
+```
+

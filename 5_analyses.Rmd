@@ -1,0 +1,293 @@
+---
+title: "Statistical analyses for peer review uncertainty study"
+author: "Adrian Barnett"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, error=FALSE, comment='', dpi=400)
+options(width=1000) # Wide pages
+options(scipen=999) # avoid scientific presentation
+library(binom) # for confidence intervals
+library(tidyr)
+library(stringr)
+library(dplyr)
+options(dplyr.summarise.inform = FALSE)
+library(janitor)
+library(flextable)
+library(ggplot2)
+library(gridExtra)
+g.theme = theme_bw() + theme(panel.grid.minor = element_blank())
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+source('99_functions.R')
+source('3_labels.R') # labels for recommendations
+
+# combine the data sets of results from 4_run_bayes_models.R
+source('5_combine_results.R')
+
+# labels
+model_labels = c('Model 0: No predictor','Model 1: Predictor associated with mean', 'Model 2a: Predictor\nassociated with uncertainty', 'Model 2b: Predictor\nassociated with uncertainty (reverse)')
+model_labels_breaks = c('Model 0: No predictor','Model 1: Predictor\nassociated with mean', 'Model 2a: Predictor\nassociated with uncertainty', 'Model 2b: Predictor\nassociated with uncertainty (reverse)')
+```
+
+
+Here we show the results of the regression models that examined if uncertainty was associated with reviewer characteristics.
+
+## Model fit
+
+The model fit was assessed using ten-fold cross validation and the mean square error with a 95% confidence interval for the mean. 
+Separate results are shown for each predictor. 
+Results are shown for the complete case and imputed data. 
+The key comparison is whether the mean square errors are smaller than the baseline model with no predictors (model 0). 
+
+### Protocol (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'protocol')
+```
+
+### Reviewer's gender (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'gender')
+```
+
+### Reviewer's time spent (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'review_time')
+```
+
+### Reviewer's experience (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'experience')
+```
+
+### Version (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'version')
+```
+
+All the submissions at Epidemiology were the first version and so this journal was not included in this analysis.
+
+
+
+### Time difference from submission to review (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'time_diff')
+```
+
+## Model fit summary
+
+The figure below summarises the model fit results as shows for each journal and predictor whether the predictor was associated with changes in the mean and/or uncertainty. 
+
+```{r, fig.width=7}
+source('5_plot_tile_summary_model.R')
+tplot
+```
+
+At Epidemiology there were no protocols and all papers were the first version.
+
+
+## Plots of fitted values
+
+### Model without predictors
+
+This is the baseline model (Model 0) where the only predictor is the reviewers' recommendations.
+
+#### F1000, No predictors
+
+```{r}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'dummy', no_predictor=TRUE, this_imputed = FALSE)
+```
+
+#### BMJ Open, No predictors
+
+```{r}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'dummy', no_predictor=TRUE, this_imputed = FALSE)
+```
+
+#### Epidemiology, No predictors
+
+```{r, fig.width=7}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'Epidemiology', this_predictor = 'dummy', no_predictor=TRUE, this_imputed = FALSE)
+```
+
+
+#### Summary statistics
+
+Here we use summary statistics to verify the fitted values from the models above. We include the modal percentage in each recommendation.
+
+```{r summary, fig.width=9, fig.height=6}
+source('5_plot_summary.R')
+pplot
+```
+
+
+### Time to peer review
+
+#### F1000, Time to peer review
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'time_diff', predictor_label = c('Baseline', 'Double time'), this_imputed = FALSE)
+```
+
+#### BMJ Open, Time to peer review
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'time_diff', predictor_label = c('Baseline', 'Double time'), this_imputed = FALSE)
+```
+
+### Gender
+
+#### F1000, gender
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'gender', predictor_label = c('Male = No', 'Male = Yes'), this_imputed = FALSE)
+```
+
+#### BMJ Open, gender
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'gender', predictor_label = c('Male = No', 'Male = Yes'), this_imputed = FALSE)
+```
+
+#### Epidemiology, gender
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+epi_gender = plot_fitted(indata = fitted, inxval = xval, this_journal = 'Epidemiology', this_predictor = 'gender', predictor_label = c('Male = No', 'Male = Yes'), this_imputed = FALSE)
+```
+
+### Version
+
+#### F1000, version
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+f1000_version = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'version', predictor_label = c('Version = 1', 'Version = 2+'), this_imputed = FALSE)
+```
+
+#### BMJ Open, version
+
+```{r, fig.width=7, fig.height=5}
+bmjopen_version = plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'version', predictor_label = c('Version = 1', 'Version = 2+'), this_imputed = FALSE)
+```
+
+```{r include = FALSE}
+# combine results across journals
+file = 'figures/fitted_version.jpg'
+jpeg(file, width = 9.5, height = 9, units = 'in', res = 600, quality = 100)
+  grid.arrange(f1000_version,
+               bmjopen_version, nrow=2)
+invisible(dev.off())
+```
+
+### Protocol
+
+#### F1000, protocol
+
+```{r, fig.width=7, fig.height=5}
+f1000_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'protocol', predictor_label = c('Protocol = No', 'Protocol = Yes'), this_imputed = FALSE)
+```
+
+#### BMJ Open, protocol
+
+```{r, fig.width=7, fig.height=5}
+bmjopen_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'protocol', predictor_label = c('Protocol = No', 'Protocol = Yes'), this_imputed = FALSE)
+```
+
+### Reviewer's time spent
+
+#### F1000, reviewer's time spent
+
+```{r, fig.width=7, fig.height=5}
+f1000_time_spent = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'review_time', predictor_label = c('Reference', 'Double'), this_imputed = FALSE)
+```
+
+#### BMJ Open, reviewer's time spent
+
+```{r, fig.width=7, fig.height=5}
+bmjopen_time_spent = plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'review_time', predictor_label = c('Reference', 'Double'), this_imputed = FALSE)
+```
+
+#### Epidemiology, reviewer's time spent
+
+```{r, fig.width=7, fig.height=5}
+epidemiology_time_spent = plot_fitted(indata = fitted, inxval = xval, this_journal = 'Epidemiology', this_predictor = 'review_time', predictor_label = c('Reference', 'Double'), this_imputed = FALSE)
+```
+
+### Reviewer's experience
+
+#### F1000, reviewer's experience
+
+```{r, fig.width=7, fig.height=5}
+f1000_experience = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'experience', predictor_label = c('Reference', '+5 years'), this_imputed = FALSE)
+```
+
+#### Epidemiology, reviewer's experience
+
+```{r, fig.width=7, fig.height=5}
+epidemiology_experience = plot_fitted(indata = fitted, inxval = xval, this_journal = 'Epidemiology', this_predictor = 'experience', predictor_label = c('Reference', '+5 years'), this_imputed = FALSE)
+```
+
+
+#### BMJ Open, reviewer's experience
+
+```{r, fig.width=7, fig.height=5}
+bmjopen_experience = plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'experience', predictor_label = c('Reference', '+5 years'), this_imputed = FALSE)
+```
+
+## Parameter estimates
+
+The tables below show the parameter estimates with the 95% confidence intervals and Bayesian posterior probability.
+
+Selected models only. Complete case estimates.
+
+### F1000, version
+
+```{r}
+tab = make_table(indata = tables, this_journal = 'F1000', this_predictor = 'version', predictor_label = c('Version = 1', 'Version = 2+'), this_imputed = FALSE, model_labels = model_labels)
+tab
+```
+
+### BMJ Open, reviewer's time spent
+
+```{r}
+tab = make_table(indata = tables, this_journal = 'BMJ Open', this_predictor = 'review_time', predictor_label = c('Baseline', 'Doubling'), this_imputed = FALSE, model_labels = model_labels)
+tab
+```
+
+### Epidemiology, gender
+
+```{r}
+tab = make_table(indata = tables, this_journal = 'Epidemiology', this_predictor = 'gender', predictor_label = c('Male = No', 'Male = Yes'), this_imputed = FALSE, model_labels = model_labels)
+tab
+```
+
+<!--- bespoke plots for paper --->
+
+```{r bespoke}
+## epidemiology gender
+epi_gender = epi_gender +
+  ggtitle('Epidemiology, gender')+
+  theme(legend.position = 'right')
+## bmj open protocol
+bmjopen_protocol = bmjopen_protocol +
+  ggtitle('BMJ Open, protocol')+
+  theme(legend.position = 'right')
+jpeg('figures/fitted_paper.jpg', width=10, height=6, units='in', quality=100, res=500)
+grid.arrange(epi_gender, bmjopen_protocol, ncol=2, widths=c(1.2,1))
+invisible(dev.off())
+```

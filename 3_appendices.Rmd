@@ -1,0 +1,133 @@
+---
+title: "Statistical analyses for peer review uncertainty study: Appendices"
+author: "Adrian Barnett"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, error=FALSE, comment='', dpi=400)
+options(width=1000) # Wide pages
+options(scipen=999) # avoid scientific presentation
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(visdat) # for missing data visualisation
+library(flextable)
+library(ggplot2)
+library(gridExtra)
+source('99_functions.R') # for make_missing_data
+
+# from 2_read_journal_data.R (after journal stuff is added)
+load('data/2_data.RData')
+
+# numbers from 3_analyses.Rmd
+load('data/3_for_appendices.Rdata')
+```
+
+## Missing data
+
+Here we look at item-missing data in the responses. We split by journal because _Epidemiology_ has six possible decisions,  whereas _BMJ Open_ has four and _F1000_ has only three.
+
+```{r, include=FALSE}
+# breaks for x-axis so that questions appear in same order as online questions
+miss.breaks = c('Uncertainty 1',
+                'Uncertainty 2',
+                'Uncertainty 3',
+                'Uncertainty 4',
+                'Uncertainty 5',
+                'Uncertainty 6',
+                'Recommendation',
+                'Paper title',
+                'Time spent on review',
+                'Gender',
+                'Years in research',
+                'Country',
+                'Time between submission and review', # data from journals
+                'Paper type',
+                'Version number',
+                'Editorial decision')
+```
+
+### BMJ Open
+
+```{r missing_bmj_open, fig.width=9, fig.height=5}
+bmj_miss = make_missing_plot(indata = data, injournal = 'BMJ Open')
+bmj_miss$plot
+```
+
+### Epidemiology
+
+```{r missing, fig.width=9, fig.height=5}
+epi_miss = make_missing_plot(indata = data, injournal = 'Epidemiology')
+epi_miss$plot
+```
+
+### F1000
+
+```{r missing_f1000, fig.width=9, fig.height=5}
+f1000_miss = make_missing_plot(indata = data, injournal = 'F1000')
+f1000_miss$plot
+```
+
+#### Overall table of missing
+
+```{r}
+overall = bind_rows(bmj_miss$table, epi_miss$table, f1000_miss$table)
+ftab = flextable(overall) %>%
+  theme_box() %>%
+  merge_v(j=1) %>%
+  autofit()
+ftab
+```
+
+The table rows are ordered by the journal and the number missing.
+
+
+## Optional comments
+
+We removed short comments like "thanks" or "none". The comments are ordered by the longest to shortest. The journal name is included.
+
+```{r comments, results='asis'}
+comments = filter(data, 
+                  !is.na(q1_5),
+                  !str_detect(tolower(q1_5), pattern = '^thank'),
+                  !str_detect(tolower(q1_5), pattern = '^na$'),
+                  !str_detect(tolower(q1_5), pattern = 'good luck.'),
+                  !str_detect(q1_5, pattern = '^None'),
+                  !str_detect(tolower(q1_5), pattern = '^no comment'),
+                  !str_detect(tolower(q1_5), pattern = '^\\.\\.\\.\\.\\.\\.'),
+                  !str_detect(tolower(q1_5), pattern = '^no further comment'),
+                  !str_detect(tolower(q1_5), pattern = '^none$'),
+                  !str_detect(tolower(q1_5), pattern = '^no other comment')
+                  ) %>%
+  mutate(words = str_count(q1_5, '\\w+'), # word count
+         nchar = nchar(q1_5))
+# stats on word counts
+stats = summarise(comments, 
+                  median = round(median(words)), 
+                  min = min(words),
+                  max = max(words))
+#
+#comments = arrange(comments, -nchar) %>% # longest to shortest - use for final version
+comments = arrange(comments, recorded_date) %>% # by date, easier for me to track new comments
+  select(journal, q1_5)
+for (k in 1:nrow(comments)){
+  cat('* ', comments$q1_5[k], ' (', comments$journal[k], ')\n', sep='')
+}
+```
+
+The median number of words per comment was `r stats$median` with a range from `r stats$min` to `r stats$max` words.
+
+
+```{r, include=FALSE}
+# big plot for paper
+p1 = bmj_miss$plot + ggtitle('BMJ Open') + theme(legend.position = 'none')
+p2 = epi_miss$plot + ggtitle('Epidemiology') + theme(legend.position = 'none')
+p3 = f1000_miss$plot + ggtitle('F1000')
+jpeg('figures/item_missing.jpg', width=7, height=9, units='in', res=500, quality = 100)
+grid.arrange(p1, p2, p3, ncol = 1, heights=c(1,1,1.1))
+invisible(dev.off())
+```
+
+

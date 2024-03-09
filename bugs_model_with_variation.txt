@@ -1,0 +1,18 @@
+model{
+  ## Likelihood
+  for (i in 1:N){
+    recommendation[i, 1:ncat] ~ dmulti(pi[i, 1:ncat], M)
+    # make probabilities
+    for (j in 1:ncat){
+      log(e[i,j]) <- alpha[j]
+      f[i,j] <- beta*X[i] # uncertainty equation (not-logged)
+      pi[i,j] <- (e[i,j] + f[i,j])/ (sum(e[i,1:ncat])+sum(f[i,1:ncat]))
+    }
+  }
+  ## Priors
+  beta ~ dnorm(0, 0.001)
+  alpha[1] <- 0
+  for (k in 2:ncat){
+    alpha[k] ~ dnorm(0, 0.001)
+  }
+}

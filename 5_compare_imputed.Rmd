@@ -1,0 +1,263 @@
+---
+title: "Compare the results from the complete case and imputed results"
+author: "Adrian Barnett"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, error=FALSE, comment='', dpi=400)
+# 
+# Feb 2024
+source('3_colours.R')
+library(ggplot2)
+g.theme = theme_bw() + theme(panel.grid.minor = element_blank())
+library(dplyr)
+
+# combine the data sets of results from 4_run_bayes_models.R
+source('5_combine_results.R')
+```
+
+# Plots of parameter estimates and 95% credible intervals for complete case and imputed data
+
+There's a separate panel for each model number.
+
+```{r function, include=FALSE}
+# plots of parameter estimates, separate facets for alpha, zeta, and beta
+run_one_plot = function(this_journal, this_predictor, est_limits = NULL){
+f = filter(tables, journal == this_journal, predictor == this_predictor) %>%
+  filter(parameter != 'alpha[1]') %>%
+  mutate(
+  facet = case_when(
+    model == 1 ~ '0',
+    model == 2 ~ '1',
+    model == 3 ~ '2a',
+    model == 4 ~ '2b'
+  ),  
+    imputed = case_when(
+    imputed == TRUE ~ "Imputed",
+    imputed == FALSE ~ "Complete case"
+  ))
+plot = ggplot(data = f, aes(x=parameter, y=mean, ymin=lower, ymax=upper, col=imputed))+
+  geom_point(position = position_dodge(width=0.4))+
+  geom_errorbar(width=0, position = position_dodge(width=0.4))+
+  ylab('Estimate')+
+  scale_color_manual(NULL, values=c('darkseagreen3','darkorange2'))+
+  xlab('')+
+  facet_wrap(~facet, scales='free_y')+
+  coord_flip()+
+  g.theme+
+  theme(legend.position = 'top')
+#
+if(!is.null(est_limits)){
+  plot = plot + coord_flip(ylim = est_limits)
+}
+#
+return(plot)
+}
+```
+
+### BMJ Open, gender
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('BMJ Open', 'gender')
+```
+
+### BMJ Open, experience
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('BMJ Open', 'experience')
+```
+
+### BMJ Open, time taken on review
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('BMJ Open', 'review_time')
+```
+
+
+### BMJ Open, version
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('BMJ Open', 'version')
+```
+
+### BMJ Open, time to peer review
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('BMJ Open', 'time_diff')
+```
+
+### BMJ Open, protocol
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('BMJ Open', 'protocol')
+```
+
+### F1000, gender
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('F1000', 'gender')
+```
+
+### F1000, experience
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('F1000', 'experience')
+```
+
+### F1000, time taken on review
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('F1000', 'review_time')
+```
+
+
+### F1000, version
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('F1000', 'version')
+```
+
+### F1000, time to peer review
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('F1000', 'time_diff')
+```
+
+### F1000, protocol
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('F1000', 'protocol', est_limits=c(-1,6)) # had to limit
+```
+
+The estimates for zeta[1] in model 1 were very uncertain and so the plot has been truncates.
+
+
+### Epidemiology, gender
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('Epidemiology', 'gender', est_limits=c(-1,10)) # had to limit
+```
+
+The estimates for zeta[1] in model 1 were very uncertain and so the plot has been truncates.
+
+### Epidemiology, experience
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('Epidemiology', 'experience')
+```
+
+### Epidemiology, time taken on review
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('Epidemiology', 'review_time')
+```
+
+### Epidemiology, time to peer review
+
+```{r, fig.width=7, fig.height=7}
+run_one_plot('Epidemiology', 'time_diff')
+```
+
+
+
+# Compare fitted results for best model 
+
+Comparing the probability estimates for the complete case and imputed data.
+
+## BMJ and protocol ##
+
+
+```{r, fig.width=7, fig.height=7}
+ncat = 4
+xlab = ''
+alabels = breaks_bmj_return
+colours = colours_bmj
+legend_lab = 'Considered\nrecommendations'
+margin = c(0,0,0,0)
+predictor_label = c('Protocol = No', 'Protocol = Yes')
+#
+f = filter(fitted, journal=='BMJ Open', predictor == 'protocol', innum <=1, model == 3) %>%
+  select(-predictor) %>%
+  mutate(imputed = case_when(
+    imputed == TRUE ~ "Imputed",
+    imputed == FALSE ~ "Complete case"
+  ),
+  predictor = recommendation >= ncat + 1,
+  recommendation = ifelse(predictor==TRUE, recommendation-ncat, recommendation), 
+  facet = case_when(
+    predictor == FALSE ~ 1, # reference category
+    predictor == TRUE ~ 2
+  ),
+  facet = factor(facet, levels=1:2, labels = predictor_label)) # to give correct ordering)
+#
+fitted_plot = ggplot(data = f, aes(x=recommendation, y=median, fill=factor(uncertainty)))+
+  geom_bar(stat='identity', position='stack', width = 0.99)+
+  ylab('Probability')+
+  xlab(xlab)+
+  scale_x_continuous(breaks=1:ncat, labels=alabels, expand = c(0,0)) + 
+  scale_y_continuous(expand = c(0,0))+
+  coord_cartesian(ylim=c(0,1))+ # because numbers are sometimes fractionally short/over
+  scale_fill_manual(legend_lab, labels=alabels, values=colours)+
+  theme_bw()+
+  facet_wrap(~facet+imputed)+
+  theme(panel.grid.minor = element_blank(), 
+        axis.text.x = element_text(angle=45, hjust=1),
+        plot.margin = margin(t = margin[1], r = margin[2], b = margin[3], l = margin[4], unit = "pt"),
+        legend.position = 'top')
+fitted_plot
+
+# export 
+jpeg('figures/imputed_bmj_protocol.jpg', width = 7, height = 7, units= 'in', res=500, quality=100)
+print(fitted_plot)
+invisible(dev.off())
+
+```
+
+## Epidemiology and gender 
+
+```{r, fig.width=7, fig.height=7}
+ncat = 5
+alabels = breaks_epi_no_none_return
+colours = colours_epi_no_none
+legend_lab = 'Considered\nrecommendations'
+margin = c(0,0,0,0)
+predictor_label = c('Male = No', 'Male = Yes')
+predictor_label = rev(predictor_label) # as it's model 4
+#
+f = filter(fitted, journal=='Epidemiology', predictor == 'gender', innum <=1, model == 4) %>%
+  select(-predictor) %>%
+  mutate(imputed = case_when(
+    imputed == TRUE ~ "Imputed",
+    imputed == FALSE ~ "Complete case"
+  ),
+  predictor = recommendation >= ncat + 1,
+  recommendation = ifelse(predictor==TRUE, recommendation-ncat, recommendation), 
+  facet = case_when(
+    predictor == FALSE ~ 1, # reference category
+    predictor == TRUE ~ 2
+  ),
+  facet = factor(facet, levels=1:2, labels = predictor_label)) # to give correct ordering)
+#
+fitted_plot = ggplot(data = f, aes(x=recommendation, y=median, fill=factor(uncertainty)))+
+  geom_bar(stat='identity', position='stack', width = 0.99)+
+  ylab('Probability')+
+  xlab(xlab)+
+  scale_x_continuous(breaks=1:ncat, labels=alabels, expand = c(0,0)) + 
+  scale_y_continuous(expand = c(0,0))+
+  coord_cartesian(ylim=c(0,1))+ # because numbers are sometimes fractionally short/over
+  scale_fill_manual(legend_lab, labels=alabels, values=colours)+
+  theme_bw()+
+  facet_wrap(~facet+imputed)+
+  theme(panel.grid.minor = element_blank(), 
+        axis.text.x = element_text(angle=45, hjust=1),
+        plot.margin = margin(t = margin[1], r = margin[2], b = margin[3], l = margin[4], unit = "pt"),
+        legend.position = 'top')
+fitted_plot
+
+# export 
+jpeg('figures/imputed_epi_gender.jpg', width = 7, height = 7, units= 'in', res=500, quality=100)
+print(fitted_plot)
+invisible(dev.off())
+```
