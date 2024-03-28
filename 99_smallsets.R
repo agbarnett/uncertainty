@@ -4,7 +4,7 @@
 library(smallsets)
 TeachingDemos::char2seed('cambridge')
 
-Smallset_Timeline(data = data,
-#                  rowCount = 5,
-                  rowNums = 1:5,
+Smallset_Timeline(data = sdata,
+                  rowCount = 5,
+#                  rowNums = 1:5,
                   code = "0_read_qualtrics_api.R")

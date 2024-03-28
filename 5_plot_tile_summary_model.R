@@ -27,12 +27,16 @@ best_wide = select(best, journal, pred_nice, model, better) %>%
   pivot_wider(names_from = model, values_from = better) %>%
   ungroup() %>%
   mutate(order = case_when( # create variable for ordering on y-axis (highest number top); match table in appendix
-    pred_nice == "Reviewer's gender" ~ 6, # reviewer variables
-    pred_nice == "Reviewer's experience" ~ 5,
-    pred_nice == "Time spent on review" ~ 4,
-    pred_nice == "Version" ~ 3, # paper variables
-    pred_nice == "Time to peer review" ~ 2,
-    pred_nice == "Protocol" ~ 1
+    pred_nice == "Male reviewers" ~ 10, # reviewer variables
+    pred_nice == "Female reviewers" ~ 9, # reviewer variables
+    pred_nice == "Reviewer's experience" ~ 8,
+    pred_nice == "Time spent on review" ~ 7,
+    pred_nice == "Version" ~ 6, # paper variables
+    pred_nice == "Time to peer review" ~ 5,
+    pred_nice == "Protocol" ~ 4,
+    pred_nice == "Number of words" ~ 3,
+    pred_nice == "Flesch readability" ~ 2,
+    pred_nice == "Dale-Chall readability" ~ 1
   )) %>%
   arrange(order, journal)
 
@@ -95,7 +99,7 @@ tplot = ggplot(newdata) +
   annotate('text', x=-1.5, y=5, label='--- Reviewer ---', angle=90)+ # trial and error with x
   annotate('text', x=-1.5, y=2, label='--- Journal ---', angle=90)+
   scale_x_continuous(expand=c(0,0), breaks=1:3, labels = levels(newdata$journal))+
-  scale_y_continuous(expand=c(0,0), breaks=1:6, labels = ylevels)
+  scale_y_continuous(expand=c(0,0), breaks=1:10, labels = ylevels)
 
 # export
 jpeg('figures/tile_plot_best_model.jpg', width=6.5, height=5.5, units='in', res=500, quality=100)

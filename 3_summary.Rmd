@@ -168,6 +168,8 @@ ftab
 
 To reduce the size of the table, we combine the countries that were given 5 times or fewer into "Other".
 
+# Paper characteristics
+
 ### Paper type
 
 ```{r}
@@ -237,6 +239,81 @@ bplot
 ```
 
 There are two outliers for F1000 which were checked.
+
+### Number of words
+
+The number of words was only available for F1000. We looked at the words in the main text, so excluding the abstract, references, tables and figures.
+
+```{r}
+hplot = ggplot(data=filter(data, journal=='F1000'), aes(x = n_words))+
+  geom_histogram(fill='darkorange2')+
+  xlab('Number of words')+
+  ylab('Count')+
+  g.theme
+hplot
+```
+
+```{r}
+stats = summarise(data,
+            Q1 = round(quantile(n_words, 0.25, na.rm=TRUE)),
+            median = round(median(n_words, na.rm=TRUE)),
+            Q3 = round(quantile(n_words, 0.75, na.rm=TRUE)))
+#
+ftab = flextable(stats) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
+
+### Flesch's Reading Ease Score
+
+This score is on a scale of 1 to 100. The higher the score, the easier it is to understand the document.
+
+```{r}
+hplot = ggplot(data=filter(data, journal=='F1000'), aes(x = flesch))+
+  geom_histogram(fill="darkorchid2")+
+  xlab('Readability score')+
+  ylab('Count')+
+  g.theme
+hplot
+```
+
+```{r}
+stats = summarise(data,
+            Q1 = round(quantile(flesch, 0.25, na.rm=TRUE)),
+            median = round(median(flesch, na.rm=TRUE)),
+            Q3 = round(quantile(flesch, 0.75, na.rm=TRUE)))
+#
+ftab = flextable(stats) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
+### The New Dale-Chall Readability formula 
+
+```{r}
+hplot = ggplot(data=filter(data, journal=='F1000'), aes(x = dale_chall))+
+  geom_histogram(fill='brown3')+
+  xlab('Readability score')+
+  ylab('Count')+
+  g.theme
+hplot
+```
+
+```{r}
+stats = summarise(data,
+            Q1 = round(quantile(dale_chall, 0.25, na.rm=TRUE)),
+            median = round(median(dale_chall, na.rm=TRUE)),
+            Q3 = round(quantile(dale_chall, 0.75, na.rm=TRUE)))
+#
+ftab = flextable(stats) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
 
 # Uncertainty in peer review
 

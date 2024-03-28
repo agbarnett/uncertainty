@@ -47,10 +47,17 @@ The key comparison is whether the mean square errors are smaller than the baseli
 plot_mse(indata = xval, inpredictor = 'protocol')
 ```
 
-### Reviewer's gender (model fit)
+### Reviewer's gender male (model fit)
 
 ```{r, fig.width=7, fig.height=3}
 plot_mse(indata = xval, inpredictor = 'gender')
+```
+
+
+### Reviewer's gender female (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'female')
 ```
 
 ### Reviewer's time spent (model fit)
@@ -80,6 +87,25 @@ All the submissions at Epidemiology were the first version and so this journal w
 ```{r, fig.width=7, fig.height=3}
 plot_mse(indata = xval, inpredictor = 'time_diff')
 ```
+
+### Number of words (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'n_words')
+```
+
+### Flesch readability (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'flesch')
+```
+
+### Dale-Chall readability (model fit)
+
+```{r, fig.width=7, fig.height=3}
+plot_mse(indata = xval, inpredictor = 'dale_chall')
+```
+
 
 ## Model fit summary
 
@@ -147,7 +173,7 @@ plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predict
 plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'time_diff', predictor_label = c('Baseline', 'Double time'), this_imputed = FALSE)
 ```
 
-### Gender
+### Male gender
 
 #### F1000, gender
 
@@ -168,6 +194,29 @@ plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_pred
 ```{r, fig.width=7, fig.height=5}
 ## plot fitted, results exported to figure folder ##
 epi_gender = plot_fitted(indata = fitted, inxval = xval, this_journal = 'Epidemiology', this_predictor = 'gender', predictor_label = c('Male = No', 'Male = Yes'), this_imputed = FALSE)
+```
+
+### Female gender
+
+#### F1000, female gender
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'female', predictor_label = c('Female = No', 'Female = Yes'), this_imputed = FALSE)
+```
+
+#### BMJ Open, female gender
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'female', predictor_label = c('Female = No', 'Female = Yes'), this_imputed = FALSE)
+```
+
+#### Epidemiology, female gender
+
+```{r, fig.width=7, fig.height=5}
+## plot fitted, results exported to figure folder ##
+epi_female = plot_fitted(indata = fitted, inxval = xval, this_journal = 'Epidemiology', this_predictor = 'female', predictor_label = c('Female = No', 'Female = Yes'), this_imputed = FALSE)
 ```
 
 ### Version
@@ -207,6 +256,31 @@ f1000_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F10
 ```{r, fig.width=7, fig.height=5}
 bmjopen_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'BMJ Open', this_predictor = 'protocol', predictor_label = c('Protocol = No', 'Protocol = Yes'), this_imputed = FALSE)
 ```
+
+### Number of words
+
+#### F1000, number of words
+
+```{r, fig.width=7, fig.height=5}
+f1000_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'n_words', predictor_label = c('Baseline', '+2000 words'), this_imputed = FALSE)
+```
+
+### Flesch readability
+
+#### F1000, Flesch readability
+
+```{r, fig.width=7, fig.height=5}
+f1000_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'flesch', predictor_label = c('Baseline', '+10'), this_imputed = FALSE)
+```
+
+### Dale-Chall readability
+
+#### F1000, Dale-Chall readability
+
+```{r, fig.width=7, fig.height=5}
+f1000_protocol = plot_fitted(indata = fitted, inxval = xval, this_journal = 'F1000', this_predictor = 'dale_chall', predictor_label = c('Baseline', '+5'), this_imputed = FALSE)
+```
+
 
 ### Reviewer's time spent
 
@@ -279,8 +353,8 @@ tab
 <!--- bespoke plots for paper --->
 
 ```{r bespoke}
-## epidemiology gender
-epi_gender = epi_gender +
+## epidemiology female gender
+epi_gender = epi_female +
   ggtitle('Epidemiology, gender')+
   theme(legend.position = 'right')
 ## bmj open protocol

@@ -9,6 +9,9 @@ library(janitor)
 library(readxl)
 source('99_functions.R')
 
+# create function to temporarily stop this step for smallsets
+read_data = function(){
+
 ### Part 1: labels ###
 # get the variable names
 names = read_excel('data/qualtrics_labels.xlsx', col_names = FALSE, n_max = 1) %>% clean_names()
@@ -18,7 +21,7 @@ in_labels = read_excel('data/qualtrics_labels.xlsx', col_names = FALSE, skip=1, 
 labs = as.character(matrix(in_labels))
 # make a frame of labels
 labels = bind_cols(names=names, labels=labs) %>%
-  filter(!str_detect(names, 'start_date'),
+  filter(!str_detect(names, 'start_date'), # do not need these variables
          !str_detect(names, 'end_date'),
          !str_detect(names, 'response_id'),
          !str_detect(names, 'user_language'),
@@ -43,7 +46,7 @@ surveys = all_surveys() %>%
   filter(str_detect(name, pattern='^Uncertainty')) # just the three uncertainty surveys
 
 ## now get uncertainty surveys
-data = NULL
+sdata = NULL
 for (k in 1:nrow(surveys)){ # BMJ Open, F1000, Epidemiology
   mysurvey = fetch_survey(surveyID = surveys$id[k], 
                           label = TRUE, # use text for surveys
@@ -63,18 +66,25 @@ for (k in 1:nrow(surveys)){ # BMJ Open, F1000, Epidemiology
            q2_4 = as.character(q2_4), # experience
            q2_2 = as.character(q2_2),
            q2_2 = str_squish(q2_2)) #  remove double spaces
-  data = bind_rows(data, mysurvey)
+  sdata = bind_rows(sdata, mysurvey)
 }
+
+# save data in temporary step 
+save(sdata, labels, file='temporary.RData')
+
+} # end of temporary function
+
+load('temporary.RData') # temporary step to bypass qualtrics data download
 
 ## removals ##
 # remove people with zero progress ... 
 
-# smallsets snap 88 data caption[Remove rows where the respondent gave no information.]caption
-cat('There were ', nrow(filter(data, progress==0)),' respondents with a zero progress.\n', sep='')
-data = filter(data, progress > 0)
+# smallsets snap 98 sdata caption[Remove rows where the respondent gave no information.]caption
+cat('There were ', nrow(filter(sdata, progress==0)),' respondents with a zero progress.\n', sep='')
+sdata = sdata[sdata$progress > 0, ] # don`t use filter for smallsets
 # ... and who did not answer any questions
 comment_questions = c('q1_5') # 
-selected_questions = select(data, 'response_id', starts_with('q')) %>% # 
+selected_questions = select(sdata, 'response_id', starts_with('q')) %>% # 
   select(-all_of(comment_questions)) %>% # remove comments
   mutate_all(as.character) %>%
   pivot_longer(cols = -response_id) %>%
@@ -85,20 +95,20 @@ all_missing = group_by(selected_questions, response_id) %>%
   summarise(n=n(), miss = sum(missing)) %>%
   filter(miss == n)
 cat('There were ', nrow(all_missing),' respondents who completed nothing\n', sep='')
-data = filter(data, !response_id %in% all_missing$response_id)
+sdata = sdata[!sdata$response_id %in% all_missing$response_id,]
 
 ## data edits
 
-# smallsets snap 112 data caption[Convert survey duration to minutes; edit hours spent on review.]caption
+# smallsets snap 122 sdata caption[Convert survey duration to minutes; edit hours spent on review.]caption
 experience_levels = c("Less than 5 years", "6 to 10 years", "11 to 15 years", "16 to 20 years", "21 years or more")
-data = mutate(data, 
+sdata = mutate(sdata, 
               duration_mins = duration_in_seconds/ 60, # use duration in minutes rather than seconds
               recorded_date_time = recorded_date,
               recorded_date = as.Date(recorded_date), # simplify
               q2_4 = factor(q2_4, levels=experience_levels), # make as a factor for ordering
               q1_4 = str_squish(q1_4)) # remove unwanted spaces
 # edits to hours spent on review
-data = mutate(data,
+sdata = mutate(sdata,
               is.minutes = str_detect(q2_2, 'min|minute'),
               q2_2 = q2_edits(q2_2), # q2_2 is in hours
               temp = q2_2, # for spotting missing edits
@@ -110,39 +120,40 @@ data = mutate(data,
          -is.minutes # no longer needed
          ) 
 # quick check for hours variable
-filter(data, is.na(q2_2)) %>% select(temp) %>% filter(!is.na(temp))
+filter(sdata, is.na(q2_2)) %>% select(temp) %>% filter(!is.na(temp))
 
 ## fix two long country labels
-data = mutate(data,
+sdata = mutate(sdata,
               q2_5 = ifelse(q2_5 == 'United States of America', 'USA', q2_5),
               q2_5 = ifelse(q2_5 == 'United Kingdom of Great Britain and Northern Ireland', 'UK', q2_5))
 
 ## tidy up "cannot answer" question
 # "If you cannot answer the question then please click this radio button"
-data = mutate(data, 
+sdata = mutate(sdata, 
               q1_2 = as.character(q1_2),
               q1_2 = ifelse(!is.na(q1_2), 'Ticked', "Not ticked")) %>%
   rename('cannot_answer' = 'q1_2')
 
 ## few more edits and drops
-data = select(data, -temp, -status, -response_id) %>% # no longer needed
+sdata = select(sdata, -temp, -status, -response_id) %>% # no longer needed
   arrange(recorded_date_time) %>% # sort from old to new
   mutate(id = 1:n()) %>% # make ID variable
   select(id, everything())
 
 ## tidy up F1000 three cut-and-paste titles
 
-# smallsets snap 144 data caption[Make edits to titles from F1000.]caption
-index = str_detect(data$q1_4, " ▬ ")
+# smallsets snap 154 sdata caption[Make edits to titles from F1000.]caption
+index = str_detect(sdata$q1_4, " ▬ ")
 index[is.na(index)] = FALSE
 for (i in which(index)){
-  title = data$q1_4[i] # original title
+  title = sdata$q1_4[i] # original title
   where = str_locate(title, " ▬ ")
   title = str_sub(title, where[2]+1, nchar(title)) # cut title from break
-  data$q1_4[i] = title # replace
+  sdata$q1_4[i] = title # replace
 }
 
 ### save ###
+data = sdata # rename
 save(data, labels, file='data/0_Reviewers_Responses.RData')
 cat('Number of data rows = ', nrow(data), '.\n', sep='')
 

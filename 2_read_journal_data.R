@@ -1,7 +1,7 @@
 # 2_read_journal_data.R
 # read in the manually entered data from the journals; just need decision, version number and dates
 # Excel sheets were created by 1_export_titles_data_entry.R
-# December 2023
+# March 2024
 library(readxl)
 library(dplyr)
 library(stringr)
@@ -92,5 +92,10 @@ data = mutate(data,
               q1_3 = ifelse(id == 204 , 'Accept', q1_3), # bmj open
               q1_3 = ifelse(id == 385 , 'Major revisions', q1_3)) # bmj open
   
+
+# add readability data for F1000, from 0_read_f1000_papers_readability.R
+load('data/0_f1000_reading.RData')
+data = left_join(data, reading_data, by='id')
+
 # save
 save(data, file='data/2_data.RData')
