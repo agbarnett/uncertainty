@@ -2,6 +2,9 @@
 
 Study of uncertainty in peer review recommendations by journal reviewers.
 
+* the main folder includes the R and Rmarkdown code and the Word documents made by the Rmarkdown code
+* the `data` folder includes the analysis data in RData and Excel
+* the `figures` folder includes the plots used to visually assess convergence of the MCMC
 
 ### R version and packages:
 
